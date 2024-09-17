@@ -1,0 +1,42 @@
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/check-casks.yml'
+      - 'Casks/**'
+  pull_request:
+    paths:
+      - '.github/workflows/check-casks.yml'
+      - 'Casks/**'
+
+jobs:
+  check:
+    strategy:
+      matrix:
+        os:
+          # macos-latest is based on arm64.
+          - macos-latest
+          # macos-12 is based on x64.
+          - macos-12
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_COLOR: 1
+      HOMEBREW_DEVELOPER: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: brew pull & reset & tap
+        run: |
+          brew update-reset "$(brew --repository)"
+          mkdir -p $(brew --repo)/Library/Taps/th-ch
+          ln -s $GITHUB_WORKSPACE $(brew --repo)/Library/Taps/th-ch/youtube-music
+      - name: Check Casks
+        run: |
+          for cask in $(ls Casks/*.rb | xargs -n 1 basename | cut -d. -f1); do
+            echo "Auditing $cask"
+            brew audit --strict $cask
+            echo "Installing $cask"
+            brew install $cask
+            echo "Uninstalling $cask"
+            brew uninstall $cask
+          done
